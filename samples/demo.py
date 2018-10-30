@@ -77,7 +77,7 @@ image = skimage.io.imread(os.path.join(IMAGE_DIR, "mytest_3.jpg"))
 # Run detection
 results = model.detect([image], verbose=1)
 
-# Visualize results
+# Visualize resultsw
 r = results[0]
 visualize.display_instances(image, r['rois'], r['masks'], r['class_ids'],
                             class_names, r['scores'])

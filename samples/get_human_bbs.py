@@ -3,6 +3,7 @@ import sys
 import random
 import math
 import numpy as np
+import pickle
 import skimage.io
 import matplotlib
 import matplotlib.pyplot as plt
@@ -68,16 +69,31 @@ class_names = ['BG', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
                'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors',
                'teddy bear', 'hair drier', 'toothbrush']
 
-# # Load a random image from the images folder
-# file_names = next(os.walk(IMAGE_DIR))[2]
-# image = skimage.io.imread(os.path.join(IMAGE_DIR, random.choice(file_names)))
 
-image = skimage.io.imread(os.path.join(IMAGE_DIR, "mytest_3.jpg"))
+def main(image_path):
+    image = skimage.io.imread(image_path)
 
-# Run detection
-results = model.detect([image], verbose=1)
+    # Run detection
+    results = model.detect([image], verbose=1)
 
-# Visualize resultsw
-r = results[0]
-visualize.display_instances(image, r['rois'], r['masks'], r['class_ids'],
-                            class_names, r['scores'])
+    # Visualize results
+    r = results[0]
+    person_rois = list([roi for index, roi in enumerate(r['rois'])
+                   if class_names[r['class_ids'][index]] == 'person'])
+    # bb_text_file_path = os.path.splitext(image_path)[0] + "bb_coords.txt"
+    # print("\nSaving bounding box coordinates to ", bb_text_file_path, "\n")
+    # with open(bb_text_file_path, 'w') as file:
+    #     for roi in person_rois:
+    #         for coordinate in roi:
+    #             file.write(str(coordinate))
+    #         file.write("\n")
+
+
+
+    visualize.display_instances(image, r['rois'], r['masks'], r['class_ids'],
+                                class_names, r['scores'])
+
+
+if __name__ == '__main__':
+    image_path = sys.argv[1]
+    main(image_path)

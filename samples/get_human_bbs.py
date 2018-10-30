@@ -70,30 +70,45 @@ class_names = ['BG', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
                'teddy bear', 'hair drier', 'toothbrush']
 
 
-def main(image_path):
-    image = skimage.io.imread(image_path)
-
+def get_bbs_from_image(image):
     # Run detection
     results = model.detect([image], verbose=1)
 
-    # Visualize results
+    # Get results and save person rois in pickle file
     r = results[0]
-    person_rois = list([roi for index, roi in enumerate(r['rois'])
-                   if class_names[r['class_ids'][index]] == 'person'])
-    # bb_text_file_path = os.path.splitext(image_path)[0] + "bb_coords.txt"
-    # print("\nSaving bounding box coordinates to ", bb_text_file_path, "\n")
-    # with open(bb_text_file_path, 'w') as file:
-    #     for roi in person_rois:
-    #         for coordinate in roi:
-    #             file.write(str(coordinate))
-    #         file.write("\n")
-
-
-
     visualize.display_instances(image, r['rois'], r['masks'], r['class_ids'],
                                 class_names, r['scores'])
 
+    person_rois = list([roi for index, roi in enumerate(r['rois'])
+                        if class_names[r['class_ids'][index]] == 'person'])
+
+    return person_rois
+
+
+def dump_bbs_to_pickle(rois, outfile_path):
+    with open(outfile_path, 'wb') as outfile:
+        pickle.dump(rois, outfile)
+    print("Rois saved to ", outfile_path)
+
+
+def main(input_path):
+
+    if os.path.isdir(input_path):
+        image_paths = [os.path.join(input_path, f) for f in os.listdir(input_path)
+                  if f.endswith('.png') or f.endswith('.jpg')]
+
+        for path in image_paths:
+            image = skimage.io.imread(path)
+            person_rois = get_bbs_from_image(image)
+            bb_pkl_path = os.path.splitext(path)[0] + "_bb_coords.pkl"
+            dump_bbs_to_pickle(person_rois, bb_pkl_path)
+    else:
+        image = skimage.io.imread(input_path)
+        person_rois = get_bbs_from_image(image)
+        bb_pkl_path = os.path.splitext(input_path)[0] + "_bb_coords.pkl"
+        dump_bbs_to_pickle(person_rois, bb_pkl_path)
+
 
 if __name__ == '__main__':
-    image_path = sys.argv[1]
-    main(image_path)
+    input_path = sys.argv[1]
+    main(input_path)

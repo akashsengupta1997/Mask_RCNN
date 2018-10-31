@@ -1,5 +1,8 @@
 import os
+# os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   # see issue #152
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import sys
+import time
 import random
 import math
 import numpy as np
@@ -10,6 +13,8 @@ import matplotlib.pyplot as plt
 
 # Root directory of the project
 ROOT_DIR = os.path.abspath("../")
+
+DETECT_TIMES = []
 
 # Import Mask RCNN
 sys.path.append(ROOT_DIR)  # To find local version of the library
@@ -72,7 +77,12 @@ class_names = ['BG', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
 
 def get_bbs_from_image(image, visualise=True):
     # Run detection
+    start = time.time()
     results = model.detect([image], verbose=1)
+    end = time.time()
+    detect_time = end - start
+    DETECT_TIMES.append(detect_time)
+    print("Detect time:", detect_time)
 
     # Get results and save person rois in pickle file
     r = results[0]
@@ -101,14 +111,15 @@ def main(input_path):
         for path in image_paths:
             image = skimage.io.imread(path)
             person_rois = get_bbs_from_image(image, visualise=False)
-            bb_pkl_path = os.path.splitext(path)[0] + "_bb_coords.pkl"
-            dump_bbs_to_pickle(person_rois, bb_pkl_path)
+            # bb_pkl_path = os.path.splitext(path)[0] + "_bb_coords.pkl"
+            # dump_bbs_to_pickle(person_rois, bb_pkl_path)
     else:
         image = skimage.io.imread(input_path)
-        person_rois = get_bbs_from_image(image)
-        bb_pkl_path = os.path.splitext(input_path)[0] + "_bb_coords.pkl"
-        dump_bbs_to_pickle(person_rois, bb_pkl_path)
+        person_rois = get_bbs_from_image(image, visualise=False)
+        # bb_pkl_path = os.path.splitext(input_path)[0] + "_bb_coords.pkl"
+        # dump_bbs_to_pickle(person_rois, bb_pkl_path)
 
+    print("Average detect time:", np.mean(DETECT_TIMES))
 
 if __name__ == '__main__':
     input_path = sys.argv[1]

@@ -70,14 +70,15 @@ class_names = ['BG', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
                'teddy bear', 'hair drier', 'toothbrush']
 
 
-def get_bbs_from_image(image):
+def get_bbs_from_image(image, visualise=True):
     # Run detection
     results = model.detect([image], verbose=1)
 
     # Get results and save person rois in pickle file
     r = results[0]
-    visualize.display_instances(image, r['rois'], r['masks'], r['class_ids'],
-                                class_names, r['scores'])
+    if visualise:
+        visualize.display_instances(image, r['rois'], r['masks'], r['class_ids'],
+                                    class_names, r['scores'])
 
     person_rois = list([roi for index, roi in enumerate(r['rois'])
                         if class_names[r['class_ids'][index]] == 'person'])
@@ -87,7 +88,7 @@ def get_bbs_from_image(image):
 
 def dump_bbs_to_pickle(rois, outfile_path):
     with open(outfile_path, 'wb') as outfile:
-        pickle.dump(rois, outfile)
+        pickle.dump(rois, outfile, protocol=2)  # protocol=2 for python2 (HMR uses this)
     print("Rois saved to ", outfile_path)
 
 
@@ -99,7 +100,7 @@ def main(input_path):
 
         for path in image_paths:
             image = skimage.io.imread(path)
-            person_rois = get_bbs_from_image(image)
+            person_rois = get_bbs_from_image(image, visualise=False)
             bb_pkl_path = os.path.splitext(path)[0] + "_bb_coords.pkl"
             dump_bbs_to_pickle(person_rois, bb_pkl_path)
     else:

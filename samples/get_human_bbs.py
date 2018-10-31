@@ -111,13 +111,13 @@ def main(input_path):
         for path in image_paths:
             image = skimage.io.imread(path)
             person_rois = get_bbs_from_image(image, visualise=False)
-            # bb_pkl_path = os.path.splitext(path)[0] + "_bb_coords.pkl"
-            # dump_bbs_to_pickle(person_rois, bb_pkl_path)
+            bb_pkl_path = os.path.splitext(path)[0] + "_bb_coords.pkl"
+            dump_bbs_to_pickle(person_rois, bb_pkl_path)
     else:
         image = skimage.io.imread(input_path)
         person_rois = get_bbs_from_image(image, visualise=False)
-        # bb_pkl_path = os.path.splitext(input_path)[0] + "_bb_coords.pkl"
-        # dump_bbs_to_pickle(person_rois, bb_pkl_path)
+        bb_pkl_path = os.path.splitext(input_path)[0] + "_bb_coords.pkl"
+        dump_bbs_to_pickle(person_rois, bb_pkl_path)
 
     print("Average detect time:", np.mean(DETECT_TIMES))
 

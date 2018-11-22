@@ -88,7 +88,7 @@ def get_bbs_from_image(image, visualise=True):
     r = results[0]
     if visualise:
         visualize.display_instances(image, r['rois'], r['masks'], r['class_ids'],
-                                    class_names, r['scores'])
+                                    class_names, r['scores'], show_bbox=False)
 
     person_rois = list([roi for index, roi in enumerate(r['rois'])
                         if class_names[r['class_ids'][index]] == 'person'])

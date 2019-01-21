@@ -182,6 +182,7 @@ def train(model):
     dataset_train = BalloonDataset()
     dataset_train.load_balloon(args.dataset, "train")
     dataset_train.prepare()
+    print('INFO', dataset_train.image_info)
 
     # Validation dataset
     dataset_val = BalloonDataset()

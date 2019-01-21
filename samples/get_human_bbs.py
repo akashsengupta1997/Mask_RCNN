@@ -88,7 +88,7 @@ def get_bbs_from_image(image, visualise=True):
     r = results[0]
     if visualise:
         visualize.display_instances(image, r['rois'], r['masks'], r['class_ids'],
-                                    class_names, r['scores'], show_bbox=False)
+                                    class_names, r['scores'], show_bbox=True)
 
     person_rois = list([roi for index, roi in enumerate(r['rois'])
                         if class_names[r['class_ids'][index]] == 'person'])
@@ -110,6 +110,8 @@ def main(input_path):
 
         for path in image_paths:
             image = skimage.io.imread(path)
+            image = image[:, :, :3]
+            print('SHAPE', image.shape)
             person_rois = get_bbs_from_image(image, visualise=False)
             bb_pkl_path = os.path.splitext(path)[0] + "_bb_coords.pkl"
             dump_bbs_to_pickle(person_rois, bb_pkl_path)

@@ -5,6 +5,8 @@ import datetime
 import numpy as np
 import skimage.draw
 from imgaug import augmenters as iaa
+from matplotlib import pyplot as plt
+
 
 # os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   # see issue #152
 # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -197,8 +199,8 @@ def predict_bodyparts(model, image_path=None, video_path=None):
                 class_ids = r["class_ids"]
                 seg_image = construct_seg_image(image.shape[:2], masks, class_ids)
                 # Save output
-                outfile_name = image_file + "_predict_up-s31.png"
-                skimage.io.imsave(outfile_name, seg_image)
+                outfile_name = os.path.splitext(image_file)[0] + "_predict_up-s31.png"
+                plt.imsave(outfile_name, seg_image)
 
         elif os.path.isfile(image_path):
             # Run model detection
@@ -210,12 +212,12 @@ def predict_bodyparts(model, image_path=None, video_path=None):
             masks = r["masks"]
             class_ids = r["class_ids"]
             seg_image = construct_seg_image(image.shape[:2], masks, class_ids)
-            # from matplotlib import pyplot as plt
             # plt.imshow(seg_image * 8)
             # plt.show()
             # Save output
-            file_name = os.path.basename(image_path) + "_predict_up-s31.png"
-            skimage.io.imsave(file_name, seg_image)
+            outfile_name = os.path.splitext(os.path.basename(image_path))[0] + \
+                        "_predict_up-s31.png"
+            plt.imsave(outfile_name, seg_image)
         else:
             print('Invalid path.')
             return None
@@ -229,8 +231,8 @@ def predict_bodyparts(model, image_path=None, video_path=None):
         fps = vcapture.get(cv2.CAP_PROP_FPS)
 
         # Define codec and create video writer
-        file_name = "bodyparts-ups31_{:%Y%m%dT%H%M%S}.avi".format(datetime.datetime.now())
-        vwriter = cv2.VideoWriter(file_name,
+        outfile_name = os.path.splitext(os.path.basename(video_path))[0] + "predict_up-s31.avi"
+        vwriter = cv2.VideoWriter(outfile_name,
                                   cv2.VideoWriter_fourcc(*'MJPG'),
                                   fps, (width, height))
         count = 0
@@ -252,7 +254,7 @@ def predict_bodyparts(model, image_path=None, video_path=None):
                 vwriter.write(seg_image)
                 count += 1
         vwriter.release()
-    print("Saved to ", file_name)
+    print("Saved to ", outfile_name)
 
 
 ############################################################

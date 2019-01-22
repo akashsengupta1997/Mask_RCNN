@@ -6,6 +6,8 @@ import numpy as np
 import skimage.draw
 from imgaug import augmenters as iaa
 
+# os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   # see issue #152
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # Root directory of the project
 ROOT_DIR = os.path.abspath("../../")
@@ -33,6 +35,7 @@ class BodyPartsConfig(Config):
     """
     NAME = "body-parts"
 
+    GPU_COUNT = 1
     IMAGES_PER_GPU = 6
 
     # Number of classes (including background)
@@ -50,8 +53,8 @@ class BodyPartsConfig(Config):
     BACKBONE = 'resnet50'
 
     IMAGE_RESIZE_MODE = "square"
-    IMAGE_MIN_DIM = 400
-    IMAGE_MAX_DIM = 800
+    IMAGE_MIN_DIM = 300
+    IMAGE_MAX_DIM = 512
 
 
 ############################################################
@@ -90,7 +93,9 @@ class BodyPartsDataset(utils.Dataset):
         class_ids: a 1D array of class IDs of the instance masks.
         """
         num_classes = 31  # excluding body parts
-        mask_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/s31/masks/train"
+        image_path = self.image_info[image_id]['path']
+        s31_folder = os.path.dirname(os.path.dirname(os.path.dirname(image_path)))
+        mask_dir = os.path.join(s31_folder, 'masks', 'train')
         mask_path = os.path.join(mask_dir, str(image_id).zfill(5) + '_ann.png')
         mask_image = skimage.io.imread(mask_path, as_gray=True)
         # from matplotlib import pyplot as plt
@@ -99,13 +104,13 @@ class BodyPartsDataset(utils.Dataset):
 
         # For UP-S31, 1 instance per class => number of instances = number of classes
         mask = np.zeros((mask_image.shape[0], mask_image.shape[1], num_classes))
-        class_ids = np.arange(num_classes)
+        class_ids = np.arange(num_classes, dtype=np.int32)
         for pixel_class in range(1, num_classes+1): # body part labels = 1-31
             indexes = list(zip(*np.where(mask_image == pixel_class)))
             for index in indexes:
                 mask[index[0], index[1], pixel_class-1] = 1.0
 
-        return mask, class_ids
+        return mask.astype(np.bool), class_ids
 
     def image_reference(self, image_id):
         """Return the path of the image."""
@@ -154,76 +159,76 @@ def train(model):
                 layers='all')
 
 
-def color_splash(image, mask):
-    """Apply color splash effect.
-    image: RGB image [height, width, 3]
-    mask: instance segmentation mask [height, width, instance count]
+# def color_splash(image, mask):
+#     """Apply color splash effect.
+#     image: RGB image [height, width, 3]
+#     mask: instance segmentation mask [height, width, instance count]
+#
+#     Returns result image.
+#     """
+#     # Make a grayscale copy of the image. The grayscale copy still
+#     # has 3 RGB channels, though.
+#     gray = skimage.color.gray2rgb(skimage.color.rgb2gray(image)) * 255
+#     # Copy color pixels from the original color image where mask is set
+#     if mask.shape[-1] > 0:
+#         # We're treating all instances as one, so collapse the mask into one layer
+#         mask = (np.sum(mask, -1, keepdims=True) >= 1)
+#         splash = np.where(mask, image, gray).astype(np.uint8)
+#     else:
+#         splash = gray.astype(np.uint8)
+#     return splash
 
-    Returns result image.
-    """
-    # Make a grayscale copy of the image. The grayscale copy still
-    # has 3 RGB channels, though.
-    gray = skimage.color.gray2rgb(skimage.color.rgb2gray(image)) * 255
-    # Copy color pixels from the original color image where mask is set
-    if mask.shape[-1] > 0:
-        # We're treating all instances as one, so collapse the mask into one layer
-        mask = (np.sum(mask, -1, keepdims=True) >= 1)
-        splash = np.where(mask, image, gray).astype(np.uint8)
-    else:
-        splash = gray.astype(np.uint8)
-    return splash
 
-
-def detect_and_color_splash(model, image_path=None, video_path=None):
-    assert image_path or video_path
-
-    # Image or video?
-    if image_path:
-        # Run model detection and generate the color splash effect
-        print("Running on {}".format(args.image))
-        # Read image
-        image = skimage.io.imread(args.image)
-        # Detect objects
-        r = model.detect([image], verbose=1)[0]
-        # Color splash
-        splash = color_splash(image, r['masks'])
-        # Save output
-        file_name = "splash_{:%Y%m%dT%H%M%S}.png".format(datetime.datetime.now())
-        skimage.io.imsave(file_name, splash)
-    elif video_path:
-        import cv2
-        # Video capture
-        vcapture = cv2.VideoCapture(video_path)
-        width = int(vcapture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(vcapture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = vcapture.get(cv2.CAP_PROP_FPS)
-
-        # Define codec and create video writer
-        file_name = "splash_{:%Y%m%dT%H%M%S}.avi".format(datetime.datetime.now())
-        vwriter = cv2.VideoWriter(file_name,
-                                  cv2.VideoWriter_fourcc(*'MJPG'),
-                                  fps, (width, height))
-
-        count = 0
-        success = True
-        while success:
-            print("frame: ", count)
-            # Read next image
-            success, image = vcapture.read()
-            if success:
-                # OpenCV returns images as BGR, convert to RGB
-                image = image[..., ::-1]
-                # Detect objects
-                r = model.detect([image], verbose=0)[0]
-                # Color splash
-                splash = color_splash(image, r['masks'])
-                # RGB -> BGR to save image to video
-                splash = splash[..., ::-1]
-                # Add image to video writer
-                vwriter.write(splash)
-                count += 1
-        vwriter.release()
-    print("Saved to ", file_name)
+# def detect_and_color_splash(model, image_path=None, video_path=None):
+#     assert image_path or video_path
+#
+#     # Image or video?
+#     if image_path:
+#         # Run model detection and generate the color splash effect
+#         print("Running on {}".format(args.image))
+#         # Read image
+#         image = skimage.io.imread(args.image)
+#         # Detect objects
+#         r = model.detect([image], verbose=1)[0]
+#         # Color splash
+#         splash = color_splash(image, r['masks'])
+#         # Save output
+#         file_name = "splash_{:%Y%m%dT%H%M%S}.png".format(datetime.datetime.now())
+#         skimage.io.imsave(file_name, splash)
+#     elif video_path:
+#         import cv2
+#         # Video capture
+#         vcapture = cv2.VideoCapture(video_path)
+#         width = int(vcapture.get(cv2.CAP_PROP_FRAME_WIDTH))
+#         height = int(vcapture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+#         fps = vcapture.get(cv2.CAP_PROP_FPS)
+#
+#         # Define codec and create video writer
+#         file_name = "splash_{:%Y%m%dT%H%M%S}.avi".format(datetime.datetime.now())
+#         vwriter = cv2.VideoWriter(file_name,
+#                                   cv2.VideoWriter_fourcc(*'MJPG'),
+#                                   fps, (width, height))
+#
+#         count = 0
+#         success = True
+#         while success:
+#             print("frame: ", count)
+#             # Read next image
+#             success, image = vcapture.read()
+#             if success:
+#                 # OpenCV returns images as BGR, convert to RGB
+#                 image = image[..., ::-1]
+#                 # Detect objects
+#                 r = model.detect([image], verbose=0)[0]
+#                 # Color splash
+#                 splash = color_splash(image, r['masks'])
+#                 # RGB -> BGR to save image to video
+#                 splash = splash[..., ::-1]
+#                 # Add image to video writer
+#                 vwriter.write(splash)
+#                 count += 1
+#         vwriter.release()
+#     print("Saved to ", file_name)
 
 
 ############################################################
@@ -235,13 +240,13 @@ if __name__ == '__main__':
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(
-        description='Train Mask R-CNN to detect balloons.')
+        description='Train Mask R-CNN to detect body parts.')
     parser.add_argument("command",
                         metavar="<command>",
-                        help="'train' or 'splash'")
+                        help="'train' or 'predict'")
     parser.add_argument('--dataset', required=False,
-                        metavar="/path/to/balloon/dataset/",
-                        help='Directory of the Balloon dataset')
+                        metavar="/path/to/train/dataset/",
+                        help='Directory of the training dataset')
     parser.add_argument('--weights', required=True,
                         metavar="/path/to/weights.h5",
                         help="Path to weights .h5 file or 'coco'")
@@ -254,15 +259,15 @@ if __name__ == '__main__':
                         help='Image to apply the color splash effect on')
     parser.add_argument('--video', required=False,
                         metavar="path or URL to video",
-                        help='Video to apply the color splash effect on')
+                        help='Video to detect body parts on')
     args = parser.parse_args()
 
     # Validate arguments
     if args.command == "train":
         assert args.dataset, "Argument --dataset is required for training"
-    elif args.command == "splash":
+    elif args.command == "predict":
         assert args.image or args.video,\
-               "Provide --image or --video to apply color splash"
+               "Provide --image or --video to predict bodyparts"
 
     print("Weights: ", args.weights)
     print("Dataset: ", args.dataset)
@@ -270,9 +275,9 @@ if __name__ == '__main__':
 
     # Configurations
     if args.command == "train":
-        config = BalloonConfig()
+        config = BodyPartsConfig()
     else:
-        class InferenceConfig(BalloonConfig):
+        class InferenceConfig(BodyPartsConfig):
             # Set batch size to 1 since we'll be running inference on
             # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
             GPU_COUNT = 1
@@ -317,9 +322,8 @@ if __name__ == '__main__':
     # Train or evaluate
     if args.command == "train":
         train(model)
-    elif args.command == "splash":
-        detect_and_color_splash(model, image_path=args.image,
-                                video_path=args.video)
+    elif args.command == "predict":
+        pass
     else:
         print("'{}' is not recognized. "
-              "Use 'train' or 'splash'".format(args.command))
+              "Use 'train' or 'predict'".format(args.command))

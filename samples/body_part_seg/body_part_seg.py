@@ -120,6 +120,9 @@ class BodyPartsDataset(utils.Dataset):
         else:
             super(self.__class__, self).image_reference(image_id)
 
+############################################################
+#  Training
+############################################################
 
 def train(model):
     """Train the model."""
@@ -159,80 +162,101 @@ def train(model):
                 layers='all')
 
 
-# def color_splash(image, mask):
-#     """Apply color splash effect.
-#     image: RGB image [height, width, 3]
-#     mask: instance segmentation mask [height, width, instance count]
-#
-#     Returns result image.
-#     """
-#     # Make a grayscale copy of the image. The grayscale copy still
-#     # has 3 RGB channels, though.
-#     gray = skimage.color.gray2rgb(skimage.color.rgb2gray(image)) * 255
-#     # Copy color pixels from the original color image where mask is set
-#     if mask.shape[-1] > 0:
-#         # We're treating all instances as one, so collapse the mask into one layer
-#         mask = (np.sum(mask, -1, keepdims=True) >= 1)
-#         splash = np.where(mask, image, gray).astype(np.uint8)
-#     else:
-#         splash = gray.astype(np.uint8)
-#     return splash
+############################################################
+#  Predicting
+############################################################
+
+def construct_seg_image(shape, masks, class_ids):
+    # Construct HxW seg image with each pixel labelled by class
+    seg_image = np.zeros(shape)
+    for instance in range(len(class_ids)):
+        print("Instance", instance)
+        class_id = class_ids[instance]
+        print("Class", class_id)
+        mask = masks[:, :, instance]
+        indexes = list(zip(*np.where(mask)))
+        for index in indexes:
+            seg_image[index] = class_id
+
+    return seg_image
 
 
-# def detect_and_color_splash(model, image_path=None, video_path=None):
-#     assert image_path or video_path
-#
-#     # Image or video?
-#     if image_path:
-#         # Run model detection and generate the color splash effect
-#         print("Running on {}".format(args.image))
-#         # Read image
-#         image = skimage.io.imread(args.image)
-#         # Detect objects
-#         r = model.detect([image], verbose=1)[0]
-#         # Color splash
-#         splash = color_splash(image, r['masks'])
-#         # Save output
-#         file_name = "splash_{:%Y%m%dT%H%M%S}.png".format(datetime.datetime.now())
-#         skimage.io.imsave(file_name, splash)
-#     elif video_path:
-#         import cv2
-#         # Video capture
-#         vcapture = cv2.VideoCapture(video_path)
-#         width = int(vcapture.get(cv2.CAP_PROP_FRAME_WIDTH))
-#         height = int(vcapture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-#         fps = vcapture.get(cv2.CAP_PROP_FPS)
-#
-#         # Define codec and create video writer
-#         file_name = "splash_{:%Y%m%dT%H%M%S}.avi".format(datetime.datetime.now())
-#         vwriter = cv2.VideoWriter(file_name,
-#                                   cv2.VideoWriter_fourcc(*'MJPG'),
-#                                   fps, (width, height))
-#
-#         count = 0
-#         success = True
-#         while success:
-#             print("frame: ", count)
-#             # Read next image
-#             success, image = vcapture.read()
-#             if success:
-#                 # OpenCV returns images as BGR, convert to RGB
-#                 image = image[..., ::-1]
-#                 # Detect objects
-#                 r = model.detect([image], verbose=0)[0]
-#                 # Color splash
-#                 splash = color_splash(image, r['masks'])
-#                 # RGB -> BGR to save image to video
-#                 splash = splash[..., ::-1]
-#                 # Add image to video writer
-#                 vwriter.write(splash)
-#                 count += 1
-#         vwriter.release()
-#     print("Saved to ", file_name)
+def predict_bodyparts(model, image_path=None, video_path=None):
+    assert image_path or video_path
+
+    # Image or video?
+    if image_path:
+        if os.path.isdir(image_path):
+            print("Running on {}".format(args.image))
+            for image_file in sorted(os.listdir(image_path)):
+                # Read image
+                image = skimage.io.imread(os.path.join(image_path, image_file))
+                # Detect objects
+                r = model.detect([image], verbose=1)[0]
+                masks = r["masks"]
+                class_ids = r["class_ids"]
+                seg_image = construct_seg_image(image.shape[:2], masks, class_ids)
+                # Save output
+                outfile_name = image_file + "_predict_up-s31.png"
+                skimage.io.imsave(outfile_name, seg_image)
+
+        elif os.path.isfile(image_path):
+            # Run model detection
+            print("Running on {}".format(args.image))
+            # Read image
+            image = skimage.io.imread(args.image)
+            # Detect objects
+            r = model.detect([image], verbose=1)[0]
+            masks = r["masks"]
+            class_ids = r["class_ids"]
+            seg_image = construct_seg_image(image.shape[:2], masks, class_ids)
+            # from matplotlib import pyplot as plt
+            # plt.imshow(seg_image * 8)
+            # plt.show()
+            # Save output
+            file_name = os.path.basename(image_path) + "_predict_up-s31.png"
+            skimage.io.imsave(file_name, seg_image)
+        else:
+            print('Invalid path.')
+            return None
+
+    elif video_path:
+        import cv2
+        # Video capture
+        vcapture = cv2.VideoCapture(video_path)
+        width = int(vcapture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(vcapture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = vcapture.get(cv2.CAP_PROP_FPS)
+
+        # Define codec and create video writer
+        file_name = "bodyparts-ups31_{:%Y%m%dT%H%M%S}.avi".format(datetime.datetime.now())
+        vwriter = cv2.VideoWriter(file_name,
+                                  cv2.VideoWriter_fourcc(*'MJPG'),
+                                  fps, (width, height))
+        count = 0
+        success = True
+        while success:
+            print("frame: ", count)
+            # Read next image
+            success, image = vcapture.read()
+            if success:
+                # OpenCV returns images as BGR, convert to RGB
+                image = image[..., ::-1]
+                # Detect objects
+                r = model.detect([image], verbose=0)[0]
+                masks = r["masks"]
+                class_ids = r["class_ids"]
+                seg_image = construct_seg_image(image.shape[:2], masks, class_ids)
+
+                # Add image to video writer
+                vwriter.write(seg_image)
+                count += 1
+        vwriter.release()
+    print("Saved to ", file_name)
 
 
 ############################################################
-#  Training
+#  Training/Predicting
 ############################################################
 
 if __name__ == '__main__':
@@ -323,7 +347,8 @@ if __name__ == '__main__':
     if args.command == "train":
         train(model)
     elif args.command == "predict":
-        pass
+        predict_bodyparts(model, image_path=args.image,
+                          video_path=args.video)
     else:
         print("'{}' is not recognized. "
               "Use 'train' or 'predict'".format(args.command))

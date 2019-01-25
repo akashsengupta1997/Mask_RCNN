@@ -45,6 +45,9 @@ class BodyPartsConfig(Config):
 
     # Number of training steps per epoch
     STEPS_PER_EPOCH = 500
+    # RPN_ANCHOR_SCALES = (8, 16, 32, 64, 128)
+    RPN_ANCHOR_SCALES = (32, 64, 128, 256, 512)
+
 
     # Skip detections with < 50% confidence
     DETECTION_MIN_CONFIDENCE = 0.5
@@ -172,9 +175,9 @@ def construct_seg_image(shape, masks, class_ids):
     # Construct HxW seg image with each pixel labelled by class
     seg_image = np.zeros(shape)
     for instance in range(len(class_ids)):
-        print("Instance", instance)
+        # print("Instance", instance)
         class_id = class_ids[instance]
-        print("Class", class_id)
+        # print("Class", class_id)
         mask = masks[:, :, instance]
         indexes = list(zip(*np.where(mask)))
         for index in indexes:
@@ -189,10 +192,14 @@ def predict_bodyparts(model, image_path=None, video_path=None):
     # Image or video?
     if image_path:
         if os.path.isdir(image_path):
+            infile_path = image_path
             print("Running on {}".format(args.image))
-            for image_file in sorted(os.listdir(image_path)):
+            for image_file in sorted(os.listdir(infile_path)):
+                print("Image:", image_file)
                 # Read image
-                image = skimage.io.imread(os.path.join(image_path, image_file))
+                image = skimage.io.imread(os.path.join(infile_path, image_file))
+                # plt.imshow(image)
+                # plt.show()
                 # Detect objects
                 r = model.detect([image], verbose=1)[0]
                 masks = r["masks"]
@@ -200,7 +207,8 @@ def predict_bodyparts(model, image_path=None, video_path=None):
                 seg_image = construct_seg_image(image.shape[:2], masks, class_ids)
                 # Save output
                 outfile_name = os.path.splitext(image_file)[0] + "_predict_up-s31.png"
-                plt.imsave(outfile_name, seg_image)
+                outfile_path = os.path.join(infile_path + "_results", outfile_name)
+                plt.imsave(outfile_path, seg_image)
 
         elif os.path.isfile(image_path):
             # Run model detection
